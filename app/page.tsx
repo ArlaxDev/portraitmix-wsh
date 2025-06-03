@@ -33,6 +33,106 @@ export default function Home() {
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
   const [animationStatus, setAnimationStatus] = useState<string>('');
 
+  // New state for image source dialog
+  const [showImageSourceDialog, setShowImageSourceDialog] = useState(false);
+  const [imageSourceType, setImageSourceType] = useState<'upload' | 'generate'>('upload');
+  const [generatePrompt, setGeneratePrompt] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [currentImageTarget, setCurrentImageTarget] = useState<'background' | 'layer'>('background');
+
+  // Show the image source dialog for background selection
+  const handleBackgroundClick = () => {
+    setCurrentImageTarget('background');
+    setImageSourceType('upload');
+    setGeneratePrompt('');
+    setShowImageSourceDialog(true);
+  };
+
+  // Show the image source dialog for layer import
+  const handleAddImageClick = () => {
+    setCurrentImageTarget('layer');
+    setImageSourceType('upload');
+    setGeneratePrompt('');
+    setShowImageSourceDialog(true);
+  };
+
+  // Handle file upload from the dialog
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const img = new window.Image();
+      img.src = URL.createObjectURL(file);
+      img.onload = () => {
+        if (currentImageTarget === 'background') {
+          setBackground(img as HTMLImageElement);
+        } else {
+          const id = Date.now();
+          setLayers((prevLayers) => [...prevLayers, { id, image: img, x: 50, y: 50, rotation: 0, scale: 1 }]);
+        }
+        setShowImageSourceDialog(false);
+        // Reset the file input
+        e.target.value = '';
+      };
+    }
+  };
+
+  // Handle image generation from text
+  const handleImageGeneration = async () => {
+    if (!generatePrompt.trim()) return;
+
+    setIsGenerating(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/gen/imagegen', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt: generatePrompt.trim()
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate image');
+      }
+
+      const data = await response.json();
+      if (data.success && data.image) {
+        // Convert base64 to image
+        const img = new window.Image();
+        img.src = `data:image/png;base64,${data.image}`;
+        img.onload = () => {
+          if (currentImageTarget === 'background') {
+            setBackground(img as HTMLImageElement);
+          } else {
+            const id = Date.now();
+            setLayers((prevLayers) => [...prevLayers, { id, image: img, x: 50, y: 50, rotation: 0, scale: 1 }]);
+          }
+          setShowImageSourceDialog(false);
+          setGeneratePrompt('');
+        };
+      } else {
+        throw new Error(data.error || 'Failed to generate image');
+      }
+    } catch (error) {
+      console.error('Error generating image:', error);
+      setError((error as Error).message || 'Failed to generate image. Please try again.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Close the image source dialog
+  const closeImageSourceDialog = () => {
+    setShowImageSourceDialog(false);
+    setGeneratePrompt('');
+    setError(null);
+  };
+
+  // Original handlers (keeping for compatibility - these won't be used in UI but needed for compilation)
   const handleBackgroundChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -313,17 +413,21 @@ export default function Home() {
     <div className="p-5">
       <h1 className="text-2xl font-bold mb-4">Image Editor</h1>
       <div className="mb-3">
-        <input type="file" accept="image/*" onChange={handleBackgroundChange} className="hidden" id="bg-upload" />
-        <label htmlFor="bg-upload" className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded cursor-pointer mr-2">
+        <button 
+          onClick={handleBackgroundClick}
+          className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded cursor-pointer mr-2"
+        >
           Select Background Image
-        </label>
+        </button>
         {background && <span className="text-sm text-gray-600">✓ Background selected</span>}
       </div>
       <div className="mb-3">
-        <input type="file" accept="image/*" onChange={handleAddImage} className="hidden" id="layer-upload" />
-        <label htmlFor="layer-upload" className="bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded cursor-pointer">
+        <button 
+          onClick={handleAddImageClick}
+          className="bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded cursor-pointer"
+        >
           Import an Image
-        </label>
+        </button>
         {layers.length > 0 && <span className="text-sm text-gray-600 ml-2">{layers.length} layer(s) added</span>}
       </div>
       <div className="border border-gray-300 rounded-lg overflow-hidden" style={{ width: "800px", height: "600px" }}>
@@ -550,6 +654,118 @@ export default function Home() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Image Source Dialog */}
+      {showImageSourceDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+          <div className="bg-gray-800 text-white rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">
+              {currentImageTarget === 'background' ? 'Select Background Image' : 'Import Image'}
+            </h2>
+            
+            {error && (
+              <div className="bg-red-500 text-white p-3 rounded mb-4">
+                {error}
+              </div>
+            )}
+            
+            {/* Options */}
+            <div className="mb-4">
+              <div className="flex flex-col gap-3">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="imageSource"
+                    value="upload"
+                    checked={imageSourceType === 'upload'}
+                    onChange={(e) => setImageSourceType(e.target.value as 'upload' | 'generate')}
+                    className="mr-2"
+                  />
+                  Load from computer
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="imageSource"
+                    value="generate"
+                    checked={imageSourceType === 'generate'}
+                    onChange={(e) => setImageSourceType(e.target.value as 'upload' | 'generate')}
+                    className="mr-2"
+                  />
+                  Generate image
+                </label>
+              </div>
+            </div>
+            
+            {/* Text input for generation */}
+            <div className="mb-4">
+              <input
+                type="text"
+                value={generatePrompt}
+                onChange={(e) => setGeneratePrompt(e.target.value)}
+                placeholder="Describe the image you want to generate..."
+                className="w-full p-2 rounded bg-gray-700 border border-gray-600 text-white"
+                disabled={imageSourceType === 'upload'}
+              />
+            </div>
+            
+            {/* Action buttons */}
+            <div className="flex justify-between gap-3">
+              <button
+                onClick={closeImageSourceDialog}
+                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded"
+                disabled={isGenerating}
+              >
+                Cancel
+              </button>
+              
+              <div className="flex gap-2">
+                {imageSourceType === 'upload' && (
+                  <>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                      id="dialog-file-upload"
+                    />
+                    <label
+                      htmlFor="dialog-file-upload"
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded cursor-pointer"
+                    >
+                      Choose File
+                    </label>
+                  </>
+                )}
+                
+                {imageSourceType === 'generate' && (
+                  <button
+                    onClick={handleImageGeneration}
+                    disabled={isGenerating || !generatePrompt.trim()}
+                    className={`px-4 py-2 rounded flex items-center ${
+                      generatePrompt.trim() && !isGenerating 
+                        ? 'bg-green-600 hover:bg-green-700' 
+                        : 'bg-gray-600 cursor-not-allowed'
+                    }`}
+                  >
+                    {isGenerating ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Generating...
+                      </>
+                    ) : (
+                      'Generate'
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
