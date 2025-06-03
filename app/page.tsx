@@ -410,68 +410,75 @@ export default function Home() {
   }, [selectedId]);
 
   return (
-    <div className="p-5">
-      <h1 className="text-2xl font-bold mb-4">Image Editor</h1>
-      <div className="mb-3">
-        <button 
-          onClick={handleBackgroundClick}
-          className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded cursor-pointer mr-2"
-        >
-          Select Background Image
-        </button>
-        {background && <span className="text-sm text-gray-600">✓ Background selected</span>}
+    <div className="min-h-screen bg-gradient-to-br from-gray-100 to-gray-300 dark:from-[#18181b] dark:to-[#23272f] p-8 flex flex-col items-center">
+      <div className="w-full max-w-5xl">
+        <h1 className="text-4xl font-extrabold mb-8 text-center tracking-tight text-gray-900 dark:text-white drop-shadow-lg">PortraitMix Image Editor</h1>
+        <div className="flex flex-col md:flex-row gap-6 mb-8">
+          <div className="flex-1 flex flex-col gap-4 bg-white/80 dark:bg-gray-900/80 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-800">
+            <button 
+              onClick={handleBackgroundClick}
+              className="bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white py-3 px-6 rounded-xl font-semibold shadow-md transition-all duration-200 flex items-center gap-2"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              Select Background Image
+            </button>
+            {background && <span className="text-sm text-green-600 font-medium flex items-center gap-1"><svg className="h-4 w-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Background selected</span>}
+            <button 
+              onClick={handleAddImageClick}
+              className="bg-gradient-to-r from-green-500 to-green-700 hover:from-green-600 hover:to-green-800 text-white py-3 px-6 rounded-xl font-semibold shadow-md transition-all duration-200 flex items-center gap-2"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              Import an Image
+            </button>
+            {layers.length > 0 && <span className="text-sm text-blue-600 font-medium flex items-center gap-1"><svg className="h-4 w-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>{layers.length} layer(s) added</span>}
+          </div>
+          <div className="flex-1 flex flex-col items-center justify-center">
+            <div className="border border-gray-300 dark:border-gray-700 rounded-2xl overflow-hidden shadow-lg bg-white/70 dark:bg-gray-900/70" style={{ width: "800px", height: "600px" }}>
+              <Stage width={800} height={600} ref={stageRef}>
+                <Layer>
+                  {background && (
+                    <KonvaImage image={background} width={800} height={600} />
+                  )}
+                  {layers.map((layer) => (
+                    <KonvaImage
+                      key={layer.id}
+                      id={`layer-${layer.id}`}
+                      image={layer.image}
+                      x={layer.x}
+                      y={layer.y}
+                      rotation={layer.rotation}
+                      scaleX={layer.scale}
+                      scaleY={layer.scale}
+                      draggable
+                      onClick={() => setSelectedId(layer.id)}
+                      onTap={() => setSelectedId(layer.id)}
+                      onDragEnd={(e) => handleDragEnd(e, layer.id)}
+                      onTransformEnd={(e) => handleTransformEnd(e, layer.id)}
+                    />
+                  ))}
+                  <Transformer
+                    ref={transformerRef}
+                    boundBoxFunc={(oldBox, newBox) => {
+                      if (newBox.width < 20 || newBox.height < 20) {
+                        return oldBox;
+                      }
+                      return newBox;
+                    }}
+                  />
+                </Layer>
+              </Stage>
+            </div>
+            <button 
+              onClick={handleGenerate} 
+              disabled={!background}
+              className={`mt-6 py-3 px-8 rounded-xl text-lg font-bold shadow-lg transition-all duration-200 flex items-center gap-2 ${background ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white' : 'bg-gray-400 text-gray-200 cursor-not-allowed'}`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              Generate
+            </button>
+          </div>
+        </div>
       </div>
-      <div className="mb-3">
-        <button 
-          onClick={handleAddImageClick}
-          className="bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded cursor-pointer"
-        >
-          Import an Image
-        </button>
-        {layers.length > 0 && <span className="text-sm text-gray-600 ml-2">{layers.length} layer(s) added</span>}
-      </div>
-      <div className="border border-gray-300 rounded-lg overflow-hidden" style={{ width: "800px", height: "600px" }}>
-        <Stage width={800} height={600} ref={stageRef}>
-          <Layer>
-            {background && (
-              <KonvaImage image={background} width={800} height={600} />
-            )}
-            {layers.map((layer) => (
-              <KonvaImage
-                key={layer.id}
-                id={`layer-${layer.id}`}
-                image={layer.image}
-                x={layer.x}
-                y={layer.y}
-                rotation={layer.rotation}
-                scaleX={layer.scale}
-                scaleY={layer.scale}
-                draggable
-                onClick={() => setSelectedId(layer.id)}
-                onTap={() => setSelectedId(layer.id)}
-                onDragEnd={(e) => handleDragEnd(e, layer.id)}
-                onTransformEnd={(e) => handleTransformEnd(e, layer.id)}
-              />
-            ))}
-            <Transformer
-              ref={transformerRef}
-              boundBoxFunc={(oldBox, newBox) => {
-                if (newBox.width < 20 || newBox.height < 20) {
-                  return oldBox;
-                }
-                return newBox;
-              }}
-            />
-          </Layer>
-        </Stage>
-      </div>
-      <button 
-        onClick={handleGenerate} 
-        disabled={!background}
-        className={`mt-3 py-2 px-4 rounded text-white ${background ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-400 cursor-not-allowed'}`}
-      >
-        Generate
-      </button>
 
       {/* Instructions Modal */}
       {showModal && (
